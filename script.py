@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from spline_map import SplineMap
 import time
+
 # Instantiating the grid map object
 map = SplineMap()
 # Opening log file
@@ -29,8 +30,8 @@ for data in file_handle:
     #print(after-before)
     k += 1
     n += 1
-    if k > 5:
-        plt.imshow(map.ctrl_pts, interpolation='nearest',cmap='gray_r', vmax = 100, vmin=-100)
+    if k > 10:
+        plt.imshow(map.ctrl_pts.reshape(map.mx,map.my), interpolation='nearest',cmap='gray_r', vmax = 100, vmin=-100)
         plt.pause(.001)
         k = 0   
     print('Average time for spline map after ', n ,' iterations: ', avg_time/n, ' ms')
