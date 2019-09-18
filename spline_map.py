@@ -1,9 +1,9 @@
 import numpy as np
 import math
 import time
-import scipy.sparse as sps
-import scipy.sparse.linalg as spsl
 
+from scipy import sparse
+from scipy.sparse.linalg import inv
 class SplineMap:
     def __init__(self):
         # Sensor scan parameters
@@ -12,16 +12,17 @@ class SplineMap:
         self.range_min = 0.12
         self.range_max = 3.5
         # Map parameters
-        self.free_detection_per_ray = 10
+        self.free_detection_per_ray = 50
         # Spline surface parameters
-        self.knot_space = .25
+        self.knot_space = .05
         self.degree = 1
-        self.xy_min = -4.25
-        self.xy_max = 4.25
+        self.xy_min = -10
+        self.xy_max = 10
         self.mx = int((self.xy_max - self.xy_min)/self.knot_space)+1
         self.my = int((self.xy_max - self.xy_min)/self.knot_space)+1
         self.ctrl_pts = np.zeros([self.mx,self.my])
-        
+        self.time = np.zeros(5) 
+
     """Removes spurious (out of range) measurements
         Input: ranges np.array<float>
     """ 
@@ -64,11 +65,12 @@ class SplineMap:
         tauy_bar = (pts_occ[1,:]-self.xy_min) % (self.knot_space)        
         muy = ((pts_occ[1,:]-self.xy_min)/self.knot_space).astype(int)
 
-        mx_occ_min = my_occ_min = min(np.min(mux),np.min(muy))
-        mx_occ_max = my_occ_max = max(np.max(mux), np.max(muy)) + 1   
+        mx_occ_min = np.min(mux)
+        my_occ_min = np.min(muy)
+        mx_occ_max = np.max(mux) + 1
+        my_occ_max = np.max(muy) + 1   
         mx_occ_len = mx_occ_max - mx_occ_min + 1  
         my_occ_len = my_occ_max - my_occ_min + 1        
-        M_occ = np.zeros([n_occ, mx_occ_len*my_occ_len  ])        
         bx0 = (self.knot_space- taux_bar)/self.knot_space 
         bx1 =  taux_bar/self.knot_space                    
         by0 = (self.knot_space- tauy_bar)/self.knot_space 
@@ -77,12 +79,13 @@ class SplineMap:
         index = np.linspace(0, n_occ-1, n_occ).astype(int)
         
         # Kronecker product
+        M_occ = sparse.lil_matrix((n_occ, mx_occ_len*my_occ_len))
         M_occ[index,(muy-my_occ_min)*(mx_occ_len)+(mux-mx_occ_min)] = bx0*by0
         M_occ[index,(muy-my_occ_min)*(mx_occ_len)+(mux-mx_occ_min+1)] = bx1*by0
         M_occ[index,(muy-my_occ_min+1)*(mx_occ_len)+(mux-mx_occ_min)] = bx0*by1
         M_occ[index,(muy-my_occ_min+1)*(mx_occ_len)+(mux-mx_occ_min+1)] = bx1*by1
 
-        ############### Free space #########################
+        # ############### Free space #########################
         n_free = pts_free.shape[1]
         # Computing spline coefficients associated to occupied space
         taux_bar = (pts_free[0,:]-self.xy_min) % (self.knot_space)
@@ -90,11 +93,12 @@ class SplineMap:
         tauy_bar = (pts_free[1,:]-self.xy_min) % (self.knot_space)        
         muy = ((pts_free[1,:]-self.xy_min)/self.knot_space).astype(int)
 
-        mx_free_min = my_free_min = mx_occ_min
-        mx_free_max = my_free_max = mx_occ_max   
+        mx_free_min = mx_occ_min
+        my_free_min = my_occ_min
+        mx_free_max = mx_occ_max
+        my_free_max = my_occ_max   
         mx_free_len = mx_free_max - mx_free_min + 1  
-        my_free_len = my_free_max - my_free_min + 1        
-        M_free = np.zeros([n_free, mx_free_len*my_free_len  ])        
+        my_free_len = my_free_max - my_free_min + 1              
         bx0 = (self.knot_space- taux_bar)/self.knot_space 
         bx1 =  taux_bar/self.knot_space                    
         by0 = (self.knot_space- tauy_bar)/self.knot_space 
@@ -103,40 +107,42 @@ class SplineMap:
         index = np.linspace(0, n_free-1, n_free).astype(int)
         
         # Kronecker product
+        M_free = sparse.lil_matrix((n_free, mx_free_len*my_free_len))
         M_free[index,(muy-my_free_min)*(mx_free_len)+(mux-mx_free_min)] = bx0*by0
         M_free[index,(muy-my_free_min)*(mx_free_len)+(mux-mx_free_min+1)] = bx1*by0
         M_free[index,(muy-my_free_min+1)*(mx_free_len)+(mux-mx_free_min)] = bx0*by1
         M_free[index,(muy-my_free_min+1)*(mx_free_len)+(mux-mx_free_min+1)] = bx1*by1
 
         # Fitting the surface using LS
-        P = np.eye(mx_occ_len*my_occ_len) +  M_occ.T @ M_occ + M_free.T @ M_free       
-        P_inv = np.linalg.inv(P)      
-        ctrl_pts = self.ctrl_pts[mx_occ_min:mx_occ_len+mx_occ_min,my_occ_min:my_occ_len+my_occ_min].flatten()
-        ctrl_pts = P_inv @ (ctrl_pts +  M_occ.T@(M_occ@ctrl_pts+1) +  M_free.T@(M_free@ctrl_pts-1) )  
+        P = sparse.identity(mx_occ_len*my_occ_len, format='lil') +  M_occ.T @ M_occ + M_free.T @ M_free       
+        #P_inv = sparse.linalg.inv(P)      
+        ctrl_pts = self.ctrl_pts[my_occ_min:my_occ_len+my_occ_min,mx_occ_min:mx_occ_len+mx_occ_min].flatten()
+        ctrl_pts=sparse.linalg.spsolve(P.tocsr(), ctrl_pts +  M_occ.T@(M_occ@ctrl_pts+1) +  M_free.T@(M_free@ctrl_pts-1))
+        # ctrl_pts = P_inv @ (ctrl_pts +  M_occ.T@(M_occ@ctrl_pts+1) +  M_free.T@(M_free@ctrl_pts-1) )  
         ctrl_pts = np.minimum(np.maximum(ctrl_pts,-100),100)
-        self.ctrl_pts[mx_occ_min:mx_occ_len+mx_occ_min,
-                      my_occ_min:my_occ_len+my_occ_min] = ctrl_pts.reshape(mx_occ_len, my_occ_len)
+        self.ctrl_pts[my_occ_min:my_occ_len+my_occ_min,
+                      mx_occ_min:mx_occ_len+mx_occ_min] = ctrl_pts.reshape(my_occ_len, mx_occ_len)
 
     """"Occupancy grid mapping routine to update map using range measurements"""
     def update_map(self, pose, ranges):
         # Removing spurious measurements
+        tic = time.time()
         ranges, angles = self.remove_spurious_measurements(ranges)
+        self.time[0] += time.time() - tic
         # Converting range measurements to metric coordinates
+        tic = time.time()
         pts_occ_local = self.range_to_coordinate(ranges, angles)
+        self.time[1] += time.time() - tic
         # Detecting free cells in metric coordinates
-        before = time.time()
+        tic = time.time()
         pts_free_local = self.detect_free_space(pose[0:2], ranges, angles)
-        after = time.time() 
-        print('[time] Detect free cells: ', after-before, ' ms')
+        self.time[2] += time.time() - tic
         # Transforming metric coordinates from the local to the global frame
-        before = time.time()
+        tic = time.time()
         pts_occ = self.local_to_global_frame(pose,pts_occ_local)
         pts_free = self.local_to_global_frame(pose,pts_free_local)
-        after = time.time() 
-        print('[time] change frame: ', after-before, ' ms')       
+        self.time[3] += time.time() - tic
         # Compute spline
-        before = time.time()
+        tic = time.time()
         self.compute_spline(pts_occ, pts_free)
-        after = time.time() 
-        print('[time] Compute spline: ', after-before), ' ms'
-        print('--------------------------')
+        self.time[4] += time.time() - tic
