@@ -3,7 +3,8 @@ import math
 import time
 
 from scipy import sparse
-from scipy.sparse.linalg import inv
+import scipy.sparse.linalg
+
 class SplineMap:
     def __init__(self):
         # Sensor scan parameters
@@ -12,9 +13,9 @@ class SplineMap:
         self.range_min = 0.12
         self.range_max = 3.5
         # Map parameters
-        self.free_detection_per_ray = 50
+        self.free_detection_per_ray = 15
         # Spline surface parameters
-        self.knot_space = .05
+        self.knot_space = .1
         self.degree = 1
         self.xy_min = -10
         self.xy_max = 10
@@ -70,16 +71,16 @@ class SplineMap:
         mx_occ_max = np.max(mux) + 1
         my_occ_max = np.max(muy) + 1   
         mx_occ_len = mx_occ_max - mx_occ_min + 1  
-        my_occ_len = my_occ_max - my_occ_min + 1        
+        my_occ_len = my_occ_max - my_occ_min + 1 
+
         bx0 = (self.knot_space- taux_bar)/self.knot_space 
         bx1 =  taux_bar/self.knot_space                    
         by0 = (self.knot_space- tauy_bar)/self.knot_space 
         by1 =  tauy_bar/self.knot_space                   
 
-        index = np.linspace(0, n_occ-1, n_occ).astype(int)
-        
         # Kronecker product
         M_occ = sparse.lil_matrix((n_occ, mx_occ_len*my_occ_len))
+        index = np.linspace(0, n_occ-1, n_occ).astype(int)       
         M_occ[index,(muy-my_occ_min)*(mx_occ_len)+(mux-mx_occ_min)] = bx0*by0
         M_occ[index,(muy-my_occ_min)*(mx_occ_len)+(mux-mx_occ_min+1)] = bx1*by0
         M_occ[index,(muy-my_occ_min+1)*(mx_occ_len)+(mux-mx_occ_min)] = bx0*by1
@@ -98,27 +99,26 @@ class SplineMap:
         mx_free_max = mx_occ_max
         my_free_max = my_occ_max   
         mx_free_len = mx_free_max - mx_free_min + 1  
-        my_free_len = my_free_max - my_free_min + 1              
+        my_free_len = my_free_max - my_free_min + 1 
+
         bx0 = (self.knot_space- taux_bar)/self.knot_space 
         bx1 =  taux_bar/self.knot_space                    
         by0 = (self.knot_space- tauy_bar)/self.knot_space 
         by1 =  tauy_bar/self.knot_space                   
 
-        index = np.linspace(0, n_free-1, n_free).astype(int)
-        
         # Kronecker product
-        M_free = sparse.lil_matrix((n_free, mx_free_len*my_free_len))
+        M_free = sparse.lil_matrix((n_free, mx_free_len*my_free_len))     
+        index = np.linspace(0, n_free-1, n_free).astype(int)    
         M_free[index,(muy-my_free_min)*(mx_free_len)+(mux-mx_free_min)] = bx0*by0
         M_free[index,(muy-my_free_min)*(mx_free_len)+(mux-mx_free_min+1)] = bx1*by0
         M_free[index,(muy-my_free_min+1)*(mx_free_len)+(mux-mx_free_min)] = bx0*by1
         M_free[index,(muy-my_free_min+1)*(mx_free_len)+(mux-mx_free_min+1)] = bx1*by1
 
-        # Fitting the surface using LS
-        P = sparse.identity(mx_occ_len*my_occ_len, format='lil') +  M_occ.T @ M_occ + M_free.T @ M_free       
-        #P_inv = sparse.linalg.inv(P)      
+        # # Fitting the surface using LS      
+        P = sparse.eye(mx_occ_len*my_occ_len, format='lil') +  M_occ.T @ M_occ + M_free.T @ M_free
         ctrl_pts = self.ctrl_pts[my_occ_min:my_occ_len+my_occ_min,mx_occ_min:mx_occ_len+mx_occ_min].flatten()
-        ctrl_pts=sparse.linalg.spsolve(P.tocsr(), ctrl_pts +  M_occ.T@(M_occ@ctrl_pts+1) +  M_free.T@(M_free@ctrl_pts-1))
-        # ctrl_pts = P_inv @ (ctrl_pts +  M_occ.T@(M_occ@ctrl_pts+1) +  M_free.T@(M_free@ctrl_pts-1) )  
+        ctrl_pts= sparse.linalg.spsolve(P.tocsr(), ctrl_pts +  M_occ.T@(M_occ@ctrl_pts+1) +  M_free.T@(M_free@ctrl_pts-1))
+ 
         ctrl_pts = np.minimum(np.maximum(ctrl_pts,-100),100)
         self.ctrl_pts[my_occ_min:my_occ_len+my_occ_min,
                       mx_occ_min:mx_occ_len+mx_occ_min] = ctrl_pts.reshape(my_occ_len, mx_occ_len)
