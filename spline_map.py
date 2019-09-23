@@ -13,7 +13,7 @@ class SplineMap:
         self.range_min = 0.12
         self.range_max = 3.5
         # Map parameters
-        self.free_detection_per_ray = 15
+        self.free_detection_per_ray = 5
         # Spline surface parameters
         self.knot_space = .1
         self.degree = 1
@@ -21,7 +21,7 @@ class SplineMap:
         self.xy_max = 10
         self.mx = int((self.xy_max - self.xy_min)/self.knot_space)+1
         self.my = int((self.xy_max - self.xy_min)/self.knot_space)+1
-        self.ctrl_pts = np.zeros([self.mx,self.my])
+        self.ctrl_pts = np.zeros(self.mx*self.my)
         self.time = np.zeros(5) 
 
     """Removes spurious (out of range) measurements
@@ -50,10 +50,12 @@ class SplineMap:
     """ Detect free space """
     def detect_free_space(self, origin, ranges, angles):
         pts = np.zeros(2).reshape(2,1)
-        free_ranges = np.linspace(0,ranges-self.knot_space, self.free_detection_per_ray)
         direction = np.array([np.cos(angles), np.sin(angles)])
-        for i in range(0, self.free_detection_per_ray):
-            pts_free = free_ranges[i,:] * direction
+        for i in range(0, len(ranges)):
+            free_ranges = np.arange(0,ranges[i], 2*self.knot_space)
+            pts_free = np.zeros((2, len(free_ranges)))
+            pts_free[0,:] = free_ranges * direction[0,i]
+            pts_free[1,:] = free_ranges * direction[1,i]
             pts = np.hstack( (pts, pts_free) )
         return pts
         
@@ -66,25 +68,18 @@ class SplineMap:
         tauy_bar = (pts_occ[1,:]-self.xy_min) % (self.knot_space)        
         muy = ((pts_occ[1,:]-self.xy_min)/self.knot_space).astype(int)
 
-        mx_occ_min = np.min(mux)
-        my_occ_min = np.min(muy)
-        mx_occ_max = np.max(mux) + 1
-        my_occ_max = np.max(muy) + 1   
-        mx_occ_len = mx_occ_max - mx_occ_min + 1  
-        my_occ_len = my_occ_max - my_occ_min + 1 
-
-        bx0 = (self.knot_space- taux_bar)/self.knot_space 
-        bx1 =  taux_bar/self.knot_space                    
-        by0 = (self.knot_space- tauy_bar)/self.knot_space 
-        by1 =  tauy_bar/self.knot_space                   
+        bx0_occ = (self.knot_space- taux_bar)/self.knot_space 
+        bx1_occ =  taux_bar/self.knot_space                    
+        by0_occ = (self.knot_space- tauy_bar)/self.knot_space 
+        by1_occ =  tauy_bar/self.knot_space                   
 
         # Kronecker product
-        M_occ = sparse.lil_matrix((n_occ, mx_occ_len*my_occ_len))
-        index = np.linspace(0, n_occ-1, n_occ).astype(int)       
-        M_occ[index,(muy-my_occ_min)*(mx_occ_len)+(mux-mx_occ_min)] = bx0*by0
-        M_occ[index,(muy-my_occ_min)*(mx_occ_len)+(mux-mx_occ_min+1)] = bx1*by0
-        M_occ[index,(muy-my_occ_min+1)*(mx_occ_len)+(mux-mx_occ_min)] = bx0*by1
-        M_occ[index,(muy-my_occ_min+1)*(mx_occ_len)+(mux-mx_occ_min+1)] = bx1*by1
+        c1_occ = (muy)*(self.mx)+(mux)
+        c2_occ = (muy)*(self.mx)+(mux+1)
+        c3_occ = (muy+1)*(self.mx)+(mux)
+        c4_occ = (muy+1)*(self.mx)+(mux+1)
+        occ_cols = np.hstack((c1_occ,c2_occ,c3_occ,c4_occ))
+        occ_row_index = np.linspace(0, n_occ-1, n_occ).astype(int) 
 
         # ############### Free space #########################
         n_free = pts_free.shape[1]
@@ -94,34 +89,49 @@ class SplineMap:
         tauy_bar = (pts_free[1,:]-self.xy_min) % (self.knot_space)        
         muy = ((pts_free[1,:]-self.xy_min)/self.knot_space).astype(int)
 
-        mx_free_min = mx_occ_min
-        my_free_min = my_occ_min
-        mx_free_max = mx_occ_max
-        my_free_max = my_occ_max   
-        mx_free_len = mx_free_max - mx_free_min + 1  
-        my_free_len = my_free_max - my_free_min + 1 
-
-        bx0 = (self.knot_space- taux_bar)/self.knot_space 
-        bx1 =  taux_bar/self.knot_space                    
-        by0 = (self.knot_space- tauy_bar)/self.knot_space 
-        by1 =  tauy_bar/self.knot_space                   
+        bx0_free = (self.knot_space- taux_bar)/self.knot_space 
+        bx1_free =  taux_bar/self.knot_space                    
+        by0_free = (self.knot_space- tauy_bar)/self.knot_space 
+        by1_free =  tauy_bar/self.knot_space                   
 
         # Kronecker product
-        M_free = sparse.lil_matrix((n_free, mx_free_len*my_free_len))     
-        index = np.linspace(0, n_free-1, n_free).astype(int)    
-        M_free[index,(muy-my_free_min)*(mx_free_len)+(mux-mx_free_min)] = bx0*by0
-        M_free[index,(muy-my_free_min)*(mx_free_len)+(mux-mx_free_min+1)] = bx1*by0
-        M_free[index,(muy-my_free_min+1)*(mx_free_len)+(mux-mx_free_min)] = bx0*by1
-        M_free[index,(muy-my_free_min+1)*(mx_free_len)+(mux-mx_free_min+1)] = bx1*by1
+        c1_free = (muy)*(self.mx)+(mux)
+        c2_free = (muy)*(self.mx)+(mux+1)
+        c3_free = (muy+1)*(self.mx)+(mux)
+        c4_free = (muy+1)*(self.mx)+(mux+1)
+        free_cols = np.hstack((c1_free,c2_free,c3_free,c4_free))
+        free_row_index = np.linspace(0, n_free-1, n_free).astype(int)
+
+        cols_unique = np.unique(np.hstack((occ_cols, free_cols)))
+
+        col_index = np.zeros(cols_unique[-1]-cols_unique[0]+1, dtype=int)
+        k = 0
+        for i in range(cols_unique[0], cols_unique[-1]+1):
+            if cols_unique[k] == i:
+                col_index[i-cols_unique[0]] = k
+                k+=1
+
+        M_occ = sparse.lil_matrix((n_occ, len(cols_unique)))
+        M_occ[occ_row_index,col_index[c1_occ-cols_unique[0]]] = bx0_occ*by0_occ
+        M_occ[occ_row_index,col_index[c2_occ-cols_unique[0]]] = bx1_occ*by0_occ
+        M_occ[occ_row_index,col_index[c3_occ-cols_unique[0]]] = bx0_occ*by1_occ
+        M_occ[occ_row_index,col_index[c4_occ-cols_unique[0]]] = bx1_occ*by1_occ
+
+        M_free = sparse.lil_matrix((n_free, len(cols_unique)))
+        M_free[free_row_index,col_index[c1_free-cols_unique[0]]] = bx0_free*by0_free
+        M_free[free_row_index,col_index[c2_free-cols_unique[0]]] = bx1_free*by0_free
+        M_free[free_row_index,col_index[c3_free-cols_unique[0]]] = bx0_free*by1_free
+        M_free[free_row_index,col_index[c4_free-cols_unique[0]]] = bx1_free*by1_free
 
         # # Fitting the surface using LS      
-        P = sparse.eye(mx_occ_len*my_occ_len, format='lil') +  M_occ.T @ M_occ + M_free.T @ M_free
-        ctrl_pts = self.ctrl_pts[my_occ_min:my_occ_len+my_occ_min,mx_occ_min:mx_occ_len+mx_occ_min].flatten()
-        ctrl_pts= sparse.linalg.spsolve(P.tocsr(), ctrl_pts +  M_occ.T@(M_occ@ctrl_pts+1) +  M_free.T@(M_free@ctrl_pts-1))
+        P =   sparse.eye(len(cols_unique), format='lil') + M_occ.T @ M_occ + M_free.T @ M_free
+        ctrl_pts = self.ctrl_pts[cols_unique]
+        ctrl_pts= sparse.linalg.spsolve(P.tocsr(), ctrl_pts + 
+                                        M_occ.T@(M_occ@ctrl_pts+1) +
+                                        M_free.T@(M_free@ctrl_pts-1) )
  
         ctrl_pts = np.minimum(np.maximum(ctrl_pts,-100),100)
-        self.ctrl_pts[my_occ_min:my_occ_len+my_occ_min,
-                      mx_occ_min:mx_occ_len+mx_occ_min] = ctrl_pts.reshape(my_occ_len, mx_occ_len)
+        self.ctrl_pts[cols_unique] = ctrl_pts
 
     """"Occupancy grid mapping routine to update map using range measurements"""
     def update_map(self, pose, ranges):

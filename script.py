@@ -34,7 +34,7 @@ for data in file_handle:
         plt.imshow(map.ctrl_pts.reshape(map.mx,map.my), interpolation='nearest',cmap='gray_r', vmax = 100, vmin=-100)
         plt.pause(.001)
         k = 0   
-    #print('Average time for spline map after ', n ,' iterations: ', avg_time/n, ' ms')
+    print('Average time for spline map after ', n ,' iterations: ', avg_time/n, ' ms')
 total_time = np.sum(map.time)
 avg_time = np.sum(map.time/n)
 print('--------')
