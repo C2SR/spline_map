@@ -13,17 +13,20 @@ class SplineMap:
         self.range_min = 0.12
         self.range_max = 3.5
         # Map parameters
-        self.free_detection_per_ray = 5
+        self.free_detection_per_ray = 25
+
         # Spline surface parameters
         self.knot_space = .1
+        self.free_detection_spacing = 1.5*self.knot_space 
         self.degree = 1
-        self.xy_min = -10
-        self.xy_max = 10
+        self.xy_min = -3.5
+        self.xy_max = 3.5
         self.mx = int((self.xy_max - self.xy_min)/self.knot_space)+1
         self.my = int((self.xy_max - self.xy_min)/self.knot_space)+1
         self.ctrl_pts = np.zeros(self.mx*self.my)
         self.time = np.zeros(5) 
-
+        self.free_ranges = np.arange(0, self.range_max, self.free_detection_spacing)
+ 
     """Removes spurious (out of range) measurements
         Input: ranges np.array<float>
     """ 
@@ -51,14 +54,11 @@ class SplineMap:
     def detect_free_space(self, origin, ranges, angles):
         pts = np.zeros(2).reshape(2,1)
         direction = np.array([np.cos(angles), np.sin(angles)])
-        for i in range(0, len(ranges)):
-            free_ranges = np.arange(0,ranges[i], 2*self.knot_space)
-            pts_free = np.zeros((2, len(free_ranges)))
-            pts_free[0,:] = free_ranges * direction[0,i]
-            pts_free[1,:] = free_ranges * direction[1,i]
+        for i in range(0, len(self.free_ranges)):
+            pts_free = self.free_ranges[i] * direction[:,ranges > self.free_ranges[i]]
             pts = np.hstack( (pts, pts_free) )
         return pts
-        
+
     def compute_spline(self, pts_occ, pts_free):
         #pts_occ = np.array([np.arange(-100,100)*.02,np.arange(-100,100)*0.02]) 
         n_occ = pts_occ.shape[1]
@@ -101,7 +101,7 @@ class SplineMap:
         c4_free = (muy+1)*(self.mx)+(mux+1)
         free_cols = np.hstack((c1_free,c2_free,c3_free,c4_free))
         free_row_index = np.linspace(0, n_free-1, n_free).astype(int)
-
+         
         cols_unique = np.unique(np.hstack((occ_cols, free_cols)))
 
         col_index = np.zeros(cols_unique[-1]-cols_unique[0]+1, dtype=int)
@@ -126,10 +126,10 @@ class SplineMap:
         # # Fitting the surface using LS      
         P =   sparse.eye(len(cols_unique), format='lil') + M_occ.T @ M_occ + M_free.T @ M_free
         ctrl_pts = self.ctrl_pts[cols_unique]
-        ctrl_pts= sparse.linalg.spsolve(P.tocsr(), ctrl_pts + 
-                                        M_occ.T@(M_occ@ctrl_pts+1) +
-                                        M_free.T@(M_free@ctrl_pts-1) )
- 
+        ctrl_pts= sparse.linalg.spsolve(P.tocsr(), ctrl_pts +  
+                                            M_occ.T@(M_occ@ctrl_pts+1) +  
+                                            M_free.T@(M_free@ctrl_pts-1))
+
         ctrl_pts = np.minimum(np.maximum(ctrl_pts,-100),100)
         self.ctrl_pts[cols_unique] = ctrl_pts
 
