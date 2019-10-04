@@ -59,51 +59,42 @@ class SplineMap:
             pts = np.hstack( (pts, pts_free) )
         return pts
 
-    def compute_spline(self, pts_occ, pts_free):
-        #pts_occ = np.array([np.arange(-100,100)*.02,np.arange(-100,100)*0.02]) 
-        n_occ = pts_occ.shape[1]
+    def compute_spline(self, pts):
         # Computing spline coefficients associated to occupied space
-        taux_bar = (pts_occ[0,:]-self.xy_min) % (self.knot_space)
-        mux = ((pts_occ[0,:]-self.xy_min)/self.knot_space).astype(int)
-        tauy_bar = (pts_occ[1,:]-self.xy_min) % (self.knot_space)        
-        muy = ((pts_occ[1,:]-self.xy_min)/self.knot_space).astype(int)
+        taux_bar = (pts[0,:]-self.xy_min) % (self.knot_space)
+        mux = ((pts[0,:]-self.xy_min)/self.knot_space).astype(int)
+        tauy_bar = (pts[1,:]-self.xy_min) % (self.knot_space)        
+        muy = ((pts[1,:]-self.xy_min)/self.knot_space).astype(int)
 
-        bx0_occ = (self.knot_space- taux_bar)/self.knot_space 
-        bx1_occ =  taux_bar/self.knot_space                    
-        by0_occ = (self.knot_space- tauy_bar)/self.knot_space 
-        by1_occ =  tauy_bar/self.knot_space                   
+        bx0 = (self.knot_space- taux_bar)/self.knot_space 
+        bx1 =  taux_bar/self.knot_space                    
+        by0 = (self.knot_space- tauy_bar)/self.knot_space 
+        by1 =  tauy_bar/self.knot_space
 
         # Kronecker product
-        c1_occ = (muy)*(self.mx)+(mux)
-        c2_occ = (muy)*(self.mx)+(mux+1)
-        c3_occ = (muy+1)*(self.mx)+(mux)
-        c4_occ = (muy+1)*(self.mx)+(mux+1)
+        c1 = (muy)*(self.mx)+(mux)
+        c2 = (muy)*(self.mx)+(mux+1)
+        c3 = (muy+1)*(self.mx)+(mux)
+        c4 = (muy+1)*(self.mx)+(mux+1)
+
+        return bx0, bx1, by0, by1, c1, c2, c3, c4
+
+    def update_spline_map(self, pts_occ, pts_free):
+        # Computing spline coefficients associated to occupied space
+        # ############### Occupied space #########################
+        n_occ = pts_occ.shape[1]
+        bx0_occ, bx1_occ, by0_occ, by1_occ, c1_occ, c2_occ, c3_occ, c4_occ = self.compute_spline(pts_occ)
         occ_cols = np.hstack((c1_occ,c2_occ,c3_occ,c4_occ))
         occ_row_index = np.linspace(0, n_occ-1, n_occ).astype(int) 
 
         # ############### Free space #########################
         n_free = pts_free.shape[1]
-        # Computing spline coefficients associated to occupied space
-        taux_bar = (pts_free[0,:]-self.xy_min) % (self.knot_space)
-        mux = ((pts_free[0,:]-self.xy_min)/self.knot_space).astype(int)
-        tauy_bar = (pts_free[1,:]-self.xy_min) % (self.knot_space)        
-        muy = ((pts_free[1,:]-self.xy_min)/self.knot_space).astype(int)
-
-        bx0_free = (self.knot_space- taux_bar)/self.knot_space 
-        bx1_free =  taux_bar/self.knot_space                    
-        by0_free = (self.knot_space- tauy_bar)/self.knot_space 
-        by1_free =  tauy_bar/self.knot_space                   
-
-        # Kronecker product
-        c1_free = (muy)*(self.mx)+(mux)
-        c2_free = (muy)*(self.mx)+(mux+1)
-        c3_free = (muy+1)*(self.mx)+(mux)
-        c4_free = (muy+1)*(self.mx)+(mux+1)
+        bx0_free, bx1_free, by0_free, by1_free, c1_free, c2_free, c3_free, c4_free = self.compute_spline(pts_free)        
         free_cols = np.hstack((c1_free,c2_free,c3_free,c4_free))
         free_row_index = np.linspace(0, n_free-1, n_free).astype(int)
          
+        # Finding control points that have to be updated 
         cols_unique = np.unique(np.hstack((occ_cols, free_cols)))
-
         col_index = np.zeros(cols_unique[-1]-cols_unique[0]+1, dtype=int)
         k = 0
         for i in range(cols_unique[0], cols_unique[-1]+1):
@@ -124,13 +115,11 @@ class SplineMap:
         M_free[free_row_index,col_index[c4_free-cols_unique[0]]] = bx1_free*by1_free
 
         # # Fitting the surface using LS      
-        P =   sparse.eye(len(cols_unique), format='lil') + M_occ.T @ M_occ + M_free.T @ M_free
+        P =   scipy.sparse.vstack((sparse.eye(len(cols_unique), format='lil'), M_occ, M_free))
         ctrl_pts = self.ctrl_pts[cols_unique]
-        ctrl_pts= sparse.linalg.spsolve(P.tocsr(), ctrl_pts +  
-                                            M_occ.T@(M_occ@ctrl_pts+1) +  
-                                            M_free.T@(M_free@ctrl_pts-1))
-
-        ctrl_pts = np.minimum(np.maximum(ctrl_pts,-100),100)
+        b = np.hstack((ctrl_pts, (M_occ@ctrl_pts+1), (M_free@ctrl_pts-1)))
+        ctrl_pts= sparse.linalg.lsqr(P.tocsr(),  b)
+        ctrl_pts = np.minimum(np.maximum(np.array(ctrl_pts[0]),-100),100)
         self.ctrl_pts[cols_unique] = ctrl_pts
 
     """"Occupancy grid mapping routine to update map using range measurements"""
@@ -154,5 +143,5 @@ class SplineMap:
         self.time[3] += time.time() - tic
         # Compute spline
         tic = time.time()
-        self.compute_spline(pts_occ, pts_free)
+        self.update_spline_map(pts_occ, pts_free)
         self.time[4] += time.time() - tic
