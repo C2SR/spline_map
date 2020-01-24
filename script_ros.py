@@ -58,5 +58,5 @@ print('Transforming local to global frame: {:.2f} ms. Relative time: {:.2f}'.for
 print('Updating logodd SPLINE map: {:.2f} ms. Relative time: {:.2f}'.format(map.time[4]/n * 1000, map.time[4]/total_time*100)) 
 
 print('--------')
-print('Average time: {:.2f} ms'.format(np.sum(map.time/n) * 1000))
-print('Average frequency: {:.2f} Hz'.format(1/(np.sum(map.time/n))))
+print('Average time: {:.2f} ms'.format(np.sum(map.time[0:5]/n) * 1000))
+print('Average frequency: {:.2f} Hz'.format(1/(np.sum(map.time[0:5]/n))))
