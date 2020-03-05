@@ -46,6 +46,19 @@ def main():
     
     total_time = np.sum(occ_grid_map.time)
     avg_time = np.sum(occ_grid_map.time/n)
+
+    print('--------')
+    print('Removing spurious measurements: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[0]/n * 1000, occ_grid_map.time[0]/total_time*100)) 
+    print('Converting range to coordinate: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[1]/n * 1000, occ_grid_map.time[1]/total_time*100)) 
+    print('Transforming local to global frame: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[2]/n * 1000, occ_grid_map.time[2]/total_time*100)) 
+    print('Transforming metric to grid coordinates: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[3]/n * 1000, occ_grid_map.time[3]/total_time*100)) 
+    print('Detecting free cells: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[4]/n * 1000, occ_grid_map.time[4]/total_time*100)) 
+    print('Updating logodd map: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[5]/n * 1000, occ_grid_map.time[5]/total_time*100)) 
+    print('--------')
+    print('Average time: {:.2f} ms'.format(np.sum(occ_grid_map.time[0:6]/n) * 1000))
+    print('Average frequency: {:.2f} Hz'.format(1/(np.sum(occ_grid_map.time[0:6]/n))))
+
+
     input("Press return key to exit")
 
 if __name__ == '__main__':
