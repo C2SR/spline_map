@@ -12,7 +12,10 @@ def main():
     file_name = sys.argv[1]
 
     # Instantiating the grid map object
-    kwargs_spline_map = {'knot_space': .05, 'map_size': np.array([25.,20.])}
+    kwargs_spline_map = {'knot_space': .2, 
+                        'map_size': np.array([25.,20.]),
+                        'logodd_occupied': .2,
+                        'logodd_free': .1}
     map = SplineMap(**kwargs_spline_map)
 
     # Opening log file
@@ -45,13 +48,13 @@ def main():
         avg_time += time.time() - before
         k += 1
         n += 1
-        if k > 100:
+        if k > 45:
             ax = plt.imshow(map.ctrl_pts.reshape([map.grid_size[0,0],map.grid_size[1,0]]), interpolation='nearest',cmap='gray_r', origin='upper', vmax = 100, vmin=-100)
             #ax.set_extent([map.xy_min,map.xy_max-map.knot_space,map.xy_min,map.xy_max-map.knot_space])
             plt.pause(.001)
             k = 0
     
-    
+    ## Computing/printing total and per task time
     total_time = np.sum(map.time[0:5])
     avg_time = np.sum(map.time[0:5]/n)
     print('--------')
