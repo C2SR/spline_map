@@ -54,13 +54,11 @@ class SplineMap:
         Input: ranges np.array<float>
     """ 
     def remove_spurious_measurements(self, ranges):
-        # TODO The following two lines are UNnecessarily computed at every iteration
-        ranges = ranges[::]
-        angles = np.linspace(self.min_angle, self.max_angle, len(ranges) )
         # Finding indices of the valid ranges
-        ind = np.logical_and(ranges >= self.range_min, ranges <= self.range_max)
+        ind_occ = np.logical_and(ranges >= self.range_min, ranges <= self.range_max)
         ind_free = (ranges >= self.range_min)        
-        return ranges[ind], angles[ind], ranges[ind_free], angles[ind_free] 
+        ranges = np.minimum(np.maximum(ranges, self.range_min), self.range_max)
+        return ranges[ind_occ], self.angles[ind_occ], ranges[ind_free], self.angles[ind_free] 
 
     """ Transforms ranges measurements to (x,y) coordinates (local frame) """
     def range_to_coordinate(self, ranges, angles):
