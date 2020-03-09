@@ -12,10 +12,10 @@ def main():
     file_name = sys.argv[1]
 
     # Instantiating the grid map object
-    kwargs_spline_map = {'knot_space': .2, 
+    kwargs_spline_map = {'knot_space': .05, 
                         'map_size': np.array([25.,20.]),
-                        'logodd_occupied': .2,
-                        'logodd_free': .1}
+                        'logodd_occupied': .9,
+                        'logodd_free': .7}
     map = SplineMap(**kwargs_spline_map)
 
     # Opening log file
