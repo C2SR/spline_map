@@ -74,18 +74,16 @@ class SplineMap:
         return np.matmul(R, local) + pose[0:2].reshape(2,1) 
 
     """ Detect free space """
-    def detect_free_space(self, origin, ranges, angles, ranges_occ, angles_occ):
+    def detect_free_space(self, origin, ranges, angles):
         pts = np.zeros([2,2])#.reshape(2,1)
         direction = np.array([np.cos(angles), np.sin(angles)])
-        ranges = np.minimum(ranges, self.range_max)
         for i in range(0, len(self.free_ranges)):
-            if self.free_ranges[i] < 2*self.knot_space:
-                subdir = direction[:,ranges - 1*self.knot_space > self.free_ranges[i]]
-                pts_free = (self.free_ranges[i]) * subdir[:,::45]             
-            else:
-                pts_free = (self.free_ranges[i]) * direction[:,ranges - 1.41*self.knot_space > self.free_ranges[i]]
+            pts_free = (self.free_ranges[i]) * direction[:,ranges - 1.41*self.knot_space > self.free_ranges[i]]
             pts = np.hstack( (pts, pts_free) )
-
+        # @TODO Test if this is faster when len(ranges) < len(self.free_ranges) 
+        #for i in range(0, len(ranges)):
+        #    pts_free = direction[:,i].reshape([2,1]) * (self.free_ranges[self.free_ranges <= ranges[i] - 1.41*self.knot_space]) 
+        #    pts = np.hstack( (pts, pts_free) )
         return pts
 
     """"Compute spline coefficients - 1D function """
@@ -188,7 +186,7 @@ class SplineMap:
         self.time[1] += time.time() - tic
         # Detecting free cells in metric coordinates
         tic = time.time()
-        pts_free_local = self.detect_free_space(pose[0:2], ranges_free, angles_free, ranges, angles)
+        pts_free_local = self.detect_free_space(pose[0:2], ranges_free, angles_free)
         self.time[2] += time.time() - tic
         # Transforming metric coordinates from the local to the global frame
         tic = time.time()
