@@ -6,5 +6,5 @@ setup(name='spline_map',
       url='https://github.com/romulortr/spline_map',
       author='Romulo T. Rodrigues',
       licence='GPLv3',
-      packages=find_namespace_packages(include=['spline_map.*']),#['spline_map/occupancy'],
+      packages=find_namespace_packages(include=['spline_map.*']),
       zip_safe=False)
