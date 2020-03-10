@@ -27,12 +27,13 @@ class OccupancyGridMap:
 
         # Grid parameters
         self.resolution = resolution
-        self.grid_size = np.array(map_size/resolution).astype(int).reshape([2,1]) + \
+        self.grid_size = np.array(map_size/resolution).astype(int).reshape([2,1]) + 1 - \
                             (np.array(map_size/resolution).astype(int).reshape([2,1]) % 2)   # these coordinates are always odd
         self.grid_center = np.array((self.grid_size-1)/2, dtype=int).reshape(2,1) 
+        self.grid_increment = int(range_max/resolution) + 1 - (int(range_max/resolution) % 2)    
+        self.occupancy_grid = np.zeros( (self.grid_size[0,0], self.grid_size[1,0]) )
         
         # LogOdd Map parameters
-        self.logodd_map = np.zeros( (self.grid_size[0,0], self.grid_size[1,0]) )
         self.logodd_occupied = logodd_occupied
         self.logodd_free = logodd_free
         self.logodd_min_free = logodd_min_free
@@ -72,11 +73,42 @@ class OccupancyGridMap:
         R = np.array([[c, -s],[s, c]])
         return np.matmul(R, local) + pose[0:2].reshape(2,1) 
  
+    """Resize the map"""
+    def update_map_size(self, cell_coordinate):
+        # Check if most POSITIVE cell coordinates are out of bounds
+        max_cell_coord = np.max(cell_coordinate, axis=1).reshape(2,1)
+        is_cell_outside_grid = max_cell_coord - (self.grid_size - 1) > 0
+        pos_grid_size_increment = is_cell_outside_grid * self.grid_increment
+        # Check if most NEGATIVE cell coordinates are out of bounds
+        min_cell_coord = np.min(cell_coordinate, axis=1).reshape(2,1)
+        is_cell_outside_grid = min_cell_coord < 0
+        neg_grid_size_increment = is_cell_outside_grid * self.grid_increment
+      
+        # Create new occupancy grid map and copy previous map
+        new_grid_size = self.grid_size + pos_grid_size_increment + neg_grid_size_increment
+        new_occupancy_grid = np.zeros([new_grid_size[0,0], new_grid_size[1,0]])
+        new_occupancy_grid[neg_grid_size_increment[0,0]:self.occupancy_grid.shape[0]+neg_grid_size_increment[0,0],
+            neg_grid_size_increment[1,0]:self.occupancy_grid.shape[1]+neg_grid_size_increment[1,0]] = self.occupancy_grid
+
+        # Update local variables
+        self.occupancy_grid = new_occupancy_grid
+        self.grid_size = new_grid_size
+        self.grid_center += neg_grid_size_increment
+
     """Converts metric coordinate to grid coordinate"""
     def metric_to_grid_coordinate(self, pose, map_coordinate):
-        pose_grid = np.array(pose[0:2]/self.resolution).reshape([2,1]).astype(int) + self.grid_center
-        grid_coordinate = np.array(map_coordinate/self.resolution).astype(int) + self.grid_center
-        return pose_grid, grid_coordinate
+        pose_cell = -np.ceil(-pose[0:2]/self.resolution).reshape([2,1]).astype(int) + self.grid_center
+        cell_coordinate = np.array(map_coordinate/self.resolution).astype(int) + self.grid_center
+
+        # Check if the map is large enough
+        while (np.sum((cell_coordinate < 0) + (cell_coordinate > self.grid_size-1))):
+            print("Resizing the map..")
+            # Resize the map
+            self.update_map_size(cell_coordinate)
+            # Recompute cell coordinates in the resized map
+            pose_cell, cell_coordinate = self.metric_to_grid_coordinate(pose, map_coordinate)
+
+        return pose_cell, cell_coordinate
     
     """Computes free cells using bresenham algorithm""" 
     def compute_free_cells(self, origin, free_cell_end):
@@ -88,13 +120,13 @@ class OccupancyGridMap:
 
     """Updates map following logodd approach"""
     def update_cell_occupancy(self, origin, occupied, free):
-        self.logodd_map[origin[0,0], origin[1,0]] = self.logodd_min_free        
+        self.occupancy_grid[origin[0,0], origin[1,0]] = self.logodd_min_free        
         for cell in free.T:
-            self.logodd_map[cell[0],cell[1]] = np.maximum(self.logodd_min_free,
-                self.logodd_map[cell[0], cell[1]] - self.logodd_free)
+            self.occupancy_grid[cell[0],cell[1]] = np.maximum(self.logodd_min_free,
+                self.occupancy_grid[cell[0], cell[1]] - self.logodd_free)
         for cell in occupied.T:
-            self.logodd_map[cell[0],cell[1]] = np.minimum(self.logodd_max_occupied,
-                self.logodd_map[cell[0], cell[1]] + self.logodd_occupied) 
+            self.occupancy_grid[cell[0],cell[1]] = np.minimum(self.logodd_max_occupied,
+                self.occupancy_grid[cell[0], cell[1]] + self.logodd_occupied) 
 
     """"Occupancy grid mapping routine to update map using range measurements"""
     def update_map(self, pose, ranges):
@@ -119,7 +151,7 @@ class OccupancyGridMap:
         self.time[3] += time.time() - tic
         # Detected free cells (bresenham algorithms)
         tic = time.time()
-        free_cells = self.compute_free_cells(pose_cell, occupied_cells)
+        free_cells = self.compute_free_cells(pose_cell, free_end_cells)
         self.time[4] += time.time() - tic
         # Update logodd map 
         tic = time.time()
