@@ -14,7 +14,7 @@ def main():
     file_handle = open(file_name, "r")
     
     # Instantiating the grid map object
-    kwargs_occupancy_map = {'resolution': .05, 'map_size': np.array([25.,20.])}
+    kwargs_occupancy_map = {'resolution': .1, 'map_size': np.array([5.,5.])}
     occ_grid_map = OccupancyGridMap(**kwargs_occupancy_map)
     
     # Retrieving sensor parameters
@@ -34,8 +34,8 @@ def main():
         occ_grid_map.update_map(pose, ranges)
         n = n + 1
         k += 1
-        if k > 100:
-            plt.imshow(occ_grid_map.logodd_map, 
+        if k > 50:
+            plt.imshow(occ_grid_map.occupancy_grid, 
                         interpolation='nearest',
                         cmap='gray_r', 
                         origin='upper',
