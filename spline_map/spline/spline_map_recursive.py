@@ -32,7 +32,7 @@ class SplineMap:
         self.ctrl_pts = .5*(logodd_max_occupied+logodd_min_free)*np.ones((self.grid_size[0,0], self.grid_size[1,0]) ).flatten()
         self.free_detection_spacing = 1.41*knot_space 
         self.free_ranges = np.arange(min(knot_space, range_min), range_max, self.free_detection_spacing)        
-
+        self.free_ranges = np.array([.0])
         # LogOdd Map parameters
         self.logodd_occupied = logodd_occupied
         self.logodd_free = logodd_free
@@ -91,7 +91,7 @@ class SplineMap:
         # Number of points
         nb_pts = len(tau)
         # Normalize regressor
-        mu    = -(np.ceil(tau/self.knot_space).astype(int)) + origin
+        mu    = -(np.ceil(-tau/self.knot_space).astype(int)) + origin
         tau_bar = (tau/self.knot_space + origin) % 1 
 
         # Compute spline function along the x-axis        
@@ -137,6 +137,7 @@ class SplineMap:
 
     """"Update the control points of the spline map"""
     def update_spline_map(self, pts_occ, pts_free):
+        print('here:', pts_free[:,0])
         # Storing number of points
         n_occ = pts_occ.shape[1]
         n_free = pts_free.shape[1]
