@@ -30,26 +30,27 @@ def main():
     # Plot
     fig, ax = plt.subplots()
     plt.show(block=False)
-    pose0 = None
-    frame0 = None
     
     k=1
     for data in file_handle:
+        # collecting the data
         data = np.fromstring( data, dtype=np.float, sep=' ' )
-        if frame0 is None:
-            frame0 = data
-        #data = frame0
         pose = np.array(data[0:3]) 
-        #print(pose)
         ranges = data[6:]
         #update the map
         before = time.time()
-        pts_occ=map.update_map(pose, ranges)
+        map.update_map(pose, ranges)
         avg_time += time.time() - before
         k += 1
         n += 1
-        if k > 45:
-            ax = plt.imshow(map.ctrl_pts.reshape([map.grid_size[0,0],map.grid_size[1,0]]), interpolation='nearest',cmap='gray_r', origin='upper', vmax = 100, vmin=-100)
+        if k > 50:
+            #print(pose[0:2])
+            ax = plt.imshow(map.ctrl_pts.reshape([map.grid_size[0,0],map.grid_size[1,0]], order='F'),
+                            interpolation='nearest',
+                            cmap='gray_r',
+                            origin='upper',
+                            vmax = 100, 
+                            vmin=-100)
             #ax.set_extent([map.xy_min,map.xy_max-map.knot_space,map.xy_min,map.xy_max-map.knot_space])
             plt.pause(.001)
             k = 0
@@ -69,7 +70,6 @@ def main():
     print('Average frequency: {:.2f} Hz'.format(1/(np.sum(map.time[0:5]/n))))
     
     input("Hit enter to continue")
-    #plt.show()
 
 if __name__ == '__main__':
     main()
