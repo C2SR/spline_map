@@ -13,7 +13,7 @@ def main():
 
     # Instantiating the grid map object
     kwargs_spline_map = {'knot_space': .05, 
-                        'map_size': np.array([25.,20.]),
+                        'map_size': np.array([5.,15.]),
                         'logodd_occupied': .9,
                         'logodd_free': .7}
     map = SplineMap(**kwargs_spline_map)
