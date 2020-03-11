@@ -87,12 +87,12 @@ class SplineMap:
         return pts
 
     """"Compute spline coefficients - 1D function """
-    def compute_spline(self, tau):
+    def compute_spline(self, tau, origin):
         # Number of points
         nb_pts = len(tau)
         # Normalize regressor
-        mu    = -(np.ceil(tau/self.knot_space).astype(int)) + self.grid_center[0,0]
-        tau_bar = (tau/self.knot_space+ self.grid_center[0,0]) % 1 
+        mu    = -(np.ceil(tau/self.knot_space).astype(int)) + origin
+        tau_bar = (tau/self.knot_space + origin) % 1 
 
         # Compute spline function along the x-axis        
         tau_3 = tau_bar + 3
@@ -118,20 +118,20 @@ class SplineMap:
         nb_pts = pts.shape[1]
 
         # Compute spline along each axis
-        bx, cx = self.compute_spline(pts[0,:])
-        by, cy = self.compute_spline(pts[1,:])
+        bx, cx = self.compute_spline(pts[0,:], self.grid_center[0,0])
+        by, cy = self.compute_spline(pts[1,:], self.grid_center[1,0])
 
         # Compute spline tensor
         B = np.zeros([nb_pts,(self.degree+1)**2])
         for i in range(0,self.degree+1):
             for j in range(0,self.degree+1):           
-                B[:,i*self.degree+j] = by[:,i]*bx[:,j]
+                B[:,i*(self.degree+1)+j] = by[:,i]*bx[:,j]
 
         # Kronecker product for index
         ctrl_pt_index = np.zeros([nb_pts,(self.degree+1)**2],dtype='int')
         for i in range(0, self.degree+1):
             for j in range(0, self.degree+1):
-                ctrl_pt_index[:,i*self.degree+j] = cx[:,i]*(self.grid_size[1,0])+cy[:,j]
+                ctrl_pt_index[:,i*(self.degree+1)+j] = cy[:,i]*(self.grid_size[0,0])+cx[:,j]
 
         return B, ctrl_pt_index
 
