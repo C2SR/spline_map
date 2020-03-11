@@ -98,7 +98,7 @@ class OccupancyGridMap:
     """Converts metric coordinate to grid coordinate"""
     def metric_to_grid_coordinate(self, pose, map_coordinate):
         pose_cell = -np.ceil(-pose[0:2]/self.resolution).reshape([2,1]).astype(int) + self.grid_center
-        cell_coordinate = np.array(map_coordinate/self.resolution).astype(int) + self.grid_center
+        cell_coordinate = -np.ceil(-map_coordinate/self.resolution).astype(int) + self.grid_center
 
         # Check if the map is large enough
         while (np.sum((cell_coordinate < 0) + (cell_coordinate > self.grid_size-1))):

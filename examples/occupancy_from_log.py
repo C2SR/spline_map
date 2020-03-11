@@ -15,7 +15,7 @@ def main():
     
     # Instantiating the grid map object
     kwargs_occupancy_map = {'resolution': .1, 'map_size': np.array([5.,5.])}
-    occ_grid_map = OccupancyGridMap(**kwargs_occupancy_map)
+    map = OccupancyGridMap(**kwargs_occupancy_map)
     
     # Retrieving sensor parameters
     data = file_handle.readline()  
@@ -27,36 +27,37 @@ def main():
     k = 0
     n = 0
     for data in file_handle:
+        # Reading data from log
         data = np.fromstring( data, dtype=np.float, sep=' ' )
         pose = data[0:3]
         ranges = data[6:]
         # update the map
-        occ_grid_map.update_map(pose, ranges)
+        map.update_map(pose, ranges)
         n = n + 1
         k += 1
         if k > 50:
-            plt.imshow(occ_grid_map.occupancy_grid, 
+            plt.imshow(map.occupancy_grid, 
                         interpolation='nearest',
                         cmap='gray_r', 
                         origin='upper',
-                        vmax = occ_grid_map.logodd_max_occupied,
-                        vmin= occ_grid_map.logodd_min_free)
+                        vmax = map.logodd_max_occupied,
+                        vmin= map.logodd_min_free)
             plt.pause(.001)
             k = 0
     
-    total_time = np.sum(occ_grid_map.time)
-    avg_time = np.sum(occ_grid_map.time/n)
+    total_time = np.sum(map.time)
+    avg_time = np.sum(map.time/n)
 
     print('--------')
-    print('Removing spurious measurements: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[0]/n * 1000, occ_grid_map.time[0]/total_time*100)) 
-    print('Converting range to coordinate: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[1]/n * 1000, occ_grid_map.time[1]/total_time*100)) 
-    print('Transforming local to global frame: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[2]/n * 1000, occ_grid_map.time[2]/total_time*100)) 
-    print('Transforming metric to grid coordinates: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[3]/n * 1000, occ_grid_map.time[3]/total_time*100)) 
-    print('Detecting free cells: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[4]/n * 1000, occ_grid_map.time[4]/total_time*100)) 
-    print('Updating logodd map: {:.2f} ms. Relative time: {:.2f}%'.format(occ_grid_map.time[5]/n * 1000, occ_grid_map.time[5]/total_time*100)) 
+    print('Removing spurious measurements: {:.2f} ms. Relative time: {:.2f}%'.format(map.time[0]/n * 1000, map.time[0]/total_time*100)) 
+    print('Converting range to coordinate: {:.2f} ms. Relative time: {:.2f}%'.format(map.time[1]/n * 1000, map.time[1]/total_time*100)) 
+    print('Transforming local to global frame: {:.2f} ms. Relative time: {:.2f}%'.format(map.time[2]/n * 1000, map.time[2]/total_time*100)) 
+    print('Transforming metric to grid coordinates: {:.2f} ms. Relative time: {:.2f}%'.format(map.time[3]/n * 1000, map.time[3]/total_time*100)) 
+    print('Detecting free cells: {:.2f} ms. Relative time: {:.2f}%'.format(map.time[4]/n * 1000, map.time[4]/total_time*100)) 
+    print('Updating logodd map: {:.2f} ms. Relative time: {:.2f}%'.format(map.time[5]/n * 1000, map.time[5]/total_time*100)) 
     print('--------')
-    print('Average time: {:.2f} ms'.format(np.sum(occ_grid_map.time[0:6]/n) * 1000))
-    print('Average frequency: {:.2f} Hz'.format(1/(np.sum(occ_grid_map.time[0:6]/n))))
+    print('Average time: {:.2f} ms'.format(np.sum(map.time[0:6]/n) * 1000))
+    print('Average frequency: {:.2f} Hz'.format(1/(np.sum(map.time[0:6]/n))))
 
 
     input("Press return key to exit")
