@@ -22,28 +22,27 @@ class SplineMap:
 
         # Spline-map parameters
         # @TODO grid_size has to be greater than (2d x 2d)
-        resolution = knot_space
-        self.resolution = knot_space
-        self.knot_space = knot_space
         self.degree = 3
-        self.grid_size = np.array(map_size/resolution+self.degree).astype(int).reshape([2,1]) + \
-                            (np.array(map_size/resolution+self.degree+1).astype(int).reshape([2,1]) % 2)  # these coordinates are always odd
-        self.grid_center = np.array((self.grid_size-1)/2, dtype=int).reshape(2,1) 
+        self.knot_space = knot_space
+        self.grid_size = np.ceil(map_size/knot_space+self.degree).astype(int).reshape([2,1]) 
+        self.grid_center = np.ceil((self.grid_size-self.degree)/2).reshape(2,1) + self.degree - 1  
         self.ctrl_pts = .5*(logodd_max_occupied+logodd_min_free)*np.ones((self.grid_size[0,0], self.grid_size[1,0]) ).flatten()
-        self.free_detection_spacing = 1.41*knot_space 
-        self.free_ranges = np.arange(min(knot_space, range_min), range_max, self.free_detection_spacing)        
-        
-        # Resize parameters
-        self.map_increment = range_max    
-        self.map_lower_limits = (self.grid_center + self.degree + 1 - self.grid_size)*self.knot_space
-        self.map_upper_limits = (self.grid_size-self.grid_center)*self.knot_space          
+        print(self.grid_size)
 
+        # Map parameters
+        self.map_increment = range_max    
+        self.map_lower_limits = (self.degree - self.grid_center)*self.knot_space
+        self.map_upper_limits = (self.grid_size-self.grid_center+1)*self.knot_space          
+        print(self.map_lower_limits)
+        print(self.map_upper_limits)
         # LogOdd Map parameters
         self.logodd_occupied = logodd_occupied
         self.logodd_free = logodd_free
         self.logodd_min_free = logodd_min_free
         self.logodd_max_occupied = logodd_max_occupied
-
+        self.free_detection_spacing = 1.41*knot_space 
+        self.free_ranges = np.arange(min(knot_space, range_min), range_max, self.free_detection_spacing)        
+        
         # Sensor scan parameters
         self.min_angle = min_angle
         self.max_angle = max_angle 
@@ -86,26 +85,26 @@ class SplineMap:
         if ((max_pts_coord >= self.map_upper_limits).any() or (min_pts_coord < self.map_lower_limits).any()):
             print('resizing the map..')
             # Check if most POSITIVE coordinates are out of bounds
-            print((max_pts_coord >= self.map_upper_limits))
-            is_pts_outside_grid = (max_pts_coord >= self.map_upper_limits)
-            pos_map_increment = is_pts_outside_grid * self.map_increment         
+            is_pts_outside_map = (max_pts_coord >= self.map_upper_limits)
+            pos_map_increment = is_pts_outside_map * self.map_increment         
             # Check if most NEGATIVE coordinates are out of bounds          
-            is_pts_outside_grid = (min_pts_coord < self.map_lower_limits)
-            neg_map_increment = is_pts_outside_grid * self.map_increment   
-            # Create new occupancy grid map and copy previous map
-            map_size = self.map_upper_limits - self.map_lower_limits + pos_map_increment + neg_map_increment 
-            grid_size = np.array(map_size/self.resolution+self.degree).astype(int).reshape([2,1]) + \
-                                (np.array(map_size/self.resolution+self.degree+1).astype(int).reshape([2,1]) % 2)  # these coordinates are always odd
-            grid_center_offset = (neg_map_increment/self.resolution).astype(int)
-            new_occupancy_grid = np.zeros([grid_size[0,0], grid_size[1,0]])
-            new_occupancy_grid[grid_center_offset[0,0]:self.grid_size[0,0]+grid_center_offset[0,0],
-                    grid_center_offset[1,0]:self.grid_size[1,0]+grid_center_offset[1,0]] = self.ctrl_pts.reshape([self.grid_size[0,0],self.grid_size[1,0]], order='F')
+            is_pts_outside_map = (min_pts_coord < self.map_lower_limits)
+            neg_map_increment = is_pts_outside_map * self.map_increment   
+            # Create new ctrl map map and copy previous map
+            new_map_size = self.map_upper_limits - self.map_lower_limits + pos_map_increment + neg_map_increment 
+            new_grid_size = np.ceil(new_map_size/self.knot_space+self.degree).astype(int).reshape([2,1]) 
+            neg_grid_size_increment = (neg_map_increment/self.knot_space).astype(int)
+            print(new_grid_size)
+            print(neg_grid_size_increment)
+            new_ctrl_pts = np.zeros([new_grid_size[0,0], new_grid_size[1,0]])
+            new_ctrl_pts[neg_grid_size_increment[0,0]:self.grid_size[0,0]+neg_grid_size_increment[0,0],
+                    neg_grid_size_increment[1,0]:self.grid_size[1,0]+neg_grid_size_increment[1,0]] = self.ctrl_pts.reshape([self.grid_size[0,0],self.grid_size[1,0]], order='F')
 
-            self.ctrl_pts = new_occupancy_grid.flatten(order='F')
-            self.grid_size = grid_size
-            self.grid_center += grid_center_offset            
-            self.map_lower_limits = (self.grid_center + self.degree + 1 - self.grid_size)*self.knot_space
-            self.map_upper_limits = (self.grid_size-self.grid_center)*self.knot_space 
+            self.ctrl_pts = new_ctrl_pts.flatten(order='F')
+            self.grid_size = new_grid_size
+            self.grid_center += neg_grid_size_increment            
+            self.map_lower_limits = (self.degree - self.grid_center)*self.knot_space
+            self.map_upper_limits = (self.grid_size-self.grid_center+1)*self.knot_space  
 
 
 
@@ -219,11 +218,13 @@ class SplineMap:
         # Converting range measurements to metric coordinates
         tic = time.time()
         pts_occ_local = self.range_to_coordinate(ranges, angles)
+        pts_free_local = self.range_to_coordinate(ranges_free, angles_free)
         self.time[1] += time.time() - tic
         # Transforming metric coordinates from the local to the global frame
         tic = time.time()
         pts_occ = self.local_to_global_frame(pose,pts_occ_local)
-        self.update_map_size(pts_occ)
+        pts_free = self.local_to_global_frame(pose,pts_free_local)
+        self.update_map_size(pts_free)
         self.time[3] += time.time() - tic        
         # Detecting free cells in metric coordinates
         tic = time.time()
