@@ -27,14 +27,12 @@ class SplineMap:
         self.grid_size = np.ceil(map_size/knot_space+self.degree).astype(int).reshape([2,1]) 
         self.grid_center = np.ceil((self.grid_size-self.degree)/2).reshape(2,1) + self.degree - 1  
         self.ctrl_pts = .5*(logodd_max_occupied+logodd_min_free)*np.ones((self.grid_size[0,0], self.grid_size[1,0]) ).flatten()
-        print(self.grid_size)
 
         # Map parameters
         self.map_increment = range_max    
         self.map_lower_limits = (self.degree - self.grid_center)*self.knot_space
         self.map_upper_limits = (self.grid_size-self.grid_center+1)*self.knot_space          
-        print(self.map_lower_limits)
-        print(self.map_upper_limits)
+
         # LogOdd Map parameters
         self.logodd_occupied = logodd_occupied
         self.logodd_free = logodd_free
@@ -94,8 +92,6 @@ class SplineMap:
             new_map_size = self.map_upper_limits - self.map_lower_limits + pos_map_increment + neg_map_increment 
             new_grid_size = np.ceil(new_map_size/self.knot_space+self.degree).astype(int).reshape([2,1]) 
             neg_grid_size_increment = (neg_map_increment/self.knot_space).astype(int)
-            print(new_grid_size)
-            print(neg_grid_size_increment)
             new_ctrl_pts = np.zeros([new_grid_size[0,0], new_grid_size[1,0]])
             new_ctrl_pts[neg_grid_size_increment[0,0]:self.grid_size[0,0]+neg_grid_size_increment[0,0],
                     neg_grid_size_increment[1,0]:self.grid_size[1,0]+neg_grid_size_increment[1,0]] = self.ctrl_pts.reshape([self.grid_size[0,0],self.grid_size[1,0]], order='F')
