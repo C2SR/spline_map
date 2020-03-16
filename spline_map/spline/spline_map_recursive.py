@@ -101,20 +101,6 @@ class SplineMap:
             self.map_lower_limits = (self.degree - self.grid_center)*self.knot_space
             self.map_upper_limits = (self.grid_size-self.grid_center+1)*self.knot_space  
 
-
-    def detect_free_space_global(self, pose, pts_free_end):
-        position = pose[0:2].reshape([2,1])
-        pts = pose[0:2].reshape([2,1])
-        direction = pts_free_end - position
-        step = 1.41*self.knot_space*direction/np.linalg.norm(direction,axis=0)
-
-        for i in range(0, pts_free_end.shape[1]):
-            pts_free = np.vstack([np.arange(position[0,0]+step[0,i],pts_free_end[0,i],step[0,i]),
-                            np.arange(position[1,0]+step[1,i],pts_free_end[1,i],step[1,i])])
-            
-            pts = np.hstack( (pts, pts_free[:,0:-1]) )
-        return pts
-
     """ Detect free space """
     def detect_free_space(self, origin, ranges, angles):
         pts = np.zeros([2,2])#.reshape(2,1)
@@ -245,29 +231,3 @@ class SplineMap:
         self.update_spline_map(pts_occ, pts_free)
         self.time[4] += time.time() - tic
         
-
-        """
-        # Removing spurious measurements
-        tic = time.time()
-        ranges, angles, ranges_free, angles_free = self.remove_spurious_measurements(ranges)
-        self.time[0] += time.time() - tic
-        # Converting range measurements to metric coordinates
-        tic = time.time()
-        pts_occ_local = self.range_to_coordinate(ranges, angles)
-        pts_free_end_local = self.range_to_coordinate(ranges_free, angles_free)
-        self.time[1] += time.time() - tic
-        # Transforming metric coordinates from the local to the global frame
-        tic = time.time()
-        pts_occ = self.local_to_global_frame(pose,pts_occ_local)
-        pts_free_end = self.local_to_global_frame(pose,pts_free_end_local)
-        self.update_map_size(pts_free_end)
-        self.time[3] += time.time() - tic        
-        # Detecting free cells in metric coordinates
-        tic = time.time()
-        pts_free = self.detect_free_space_global(pose, pts_free_end)
-        self.time[2] += time.time() - tic
-        # Compute spline
-        tic = time.time()
-        self.update_spline_map(pts_occ, pts_free)
-        self.time[4] += time.time() - tic        
-        """        
