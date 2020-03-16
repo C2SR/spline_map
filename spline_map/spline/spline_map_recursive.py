@@ -2,7 +2,6 @@ import numpy as np
 import math
 import time
 
-from scipy import sparse
 import scipy.sparse.linalg
 
 class SplineMap:
