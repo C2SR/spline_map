@@ -14,7 +14,7 @@ def main():
     file_handle = open(file_name, "r")
     
     # Instantiating the grid map object
-    kwargs_occupancy_map = {'resolution': .1, 'map_size': np.array([5.,5.])}
+    kwargs_occupancy_map = {'resolution': .05, 'map_size': np.array([5.,5.])}
     map = OccupancyGridMap(**kwargs_occupancy_map)
     
     # Retrieving sensor parameters
