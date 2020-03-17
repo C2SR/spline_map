@@ -16,7 +16,7 @@ def main():
 
     # Instantiating the grid map object
     kwargs_spline= {'knot_space': .05, 
-                    'map_size': np.array([15.,15.]),
+                    'map_size': np.array([10.,10.]),
                     'logodd_occupied': .9,
                     'logodd_free': .7}
     localization = SplineLocalization(**kwargs_spline)
@@ -41,19 +41,29 @@ def main():
         data = np.fromstring( data, dtype=np.float, sep=' ' )
         pose = np.array(data[0:3]) 
         ranges = data[6:]
-        if n < 100:
+        if n < 10:
             localization.pose = pose
         else:
-            localization.update_localization(map, ranges, pose)
+            localization.update_localization(map, ranges)
+            localization.update_localization(map, ranges)
+            localization.update_localization(map, ranges)
+            localization.update_localization(map, ranges)
+            localization.update_localization(map, ranges)
+            localization.update_localization(map, ranges)  
+            localization.update_localization(map, ranges)
+            localization.update_localization(map, ranges)
+            localization.update_localization(map, ranges)                       
             print('true pose:', pose)
-            print('éstimated pose:', localization.pose)
+            print('Estimated pose:', localization.pose)
+            print('Estimation error:', pose-localization.pose)
+            print('####################################')
         #update the map
         before = time.time()
         map.update_map(localization.pose, ranges)
         avg_time += time.time() - before
         k += 1
         n += 1
-        if k > 15:
+        if k > 25:
             #print(pose[0:2])
             ax = plt.imshow(map.ctrl_pts.reshape([map.grid_size[0,0],map.grid_size[1,0]], order='F'),
                             interpolation='nearest',

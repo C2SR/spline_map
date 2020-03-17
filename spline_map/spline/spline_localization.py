@@ -124,13 +124,13 @@ class SplineLocalization:
         # Fitting error
         e_occ = (1 - y_est_occ/self.logodd_max_occupied) 
         # compute H and b
-        dtau = np.array([[1,0],[0,1]])
-        H = np.zeros([2,2])
-        b = np.zeros([2,1])
+        dtau = np.array([[1,0,0],[0,1,0]])
+        H = np.zeros([3,3])
+        b = np.zeros([3,1])
         for i in range(0, n_occ):
             c, s = np.cos(pose[2]), np.sin(pose[2]) 
-            #dtau[0,2] = -s*pts_occ_local[0,i]-c*pts_occ_local[1,i]
-            #dtau[1,2] =  c*pts_occ_local[0,i]-s*pts_occ_local[1,i]
+            dtau[0,2] = -s*pts_occ_local[0,i]-c*pts_occ_local[1,i]
+            dtau[1,2] =  c*pts_occ_local[0,i]-s*pts_occ_local[1,i]
             hi = dtau.T @ dB_occ[2*i:2*i+2,:] @ (map.ctrl_pts[c_index_occ[i,:]]).reshape((self.degree+1)**2,1) 
             H += hi @ hi.T 
             b += hi*e_occ[i]
@@ -139,14 +139,14 @@ class SplineLocalization:
             delta_pose = np.linalg.inv(H)@b
             self.pose[0] += delta_pose[0,0]
             self.pose[1] += delta_pose[1,0]
+            self.pose[2] += delta_pose[2,0]           
         else:
             print('[Localization] Failed')
 
 
     """"Occupancy grid mapping routine to update map using range measurements"""
-    def update_localization(self, map, ranges, pose):
+    def update_localization(self, map, ranges):
         # Removing spurious measurements
-        self.pose[2] = pose[2]
         tic = time.time()
         ranges, angles = self.remove_spurious_measurements(ranges)
         self.time[0] += time.time() - tic
@@ -161,4 +161,6 @@ class SplineLocalization:
         # Localization
         tic = time.time()
         self.compute_pose(map, pts_occ_local, pts_occ, self.pose)
+
+
         self.time[4] += time.time() - tic
