@@ -15,7 +15,7 @@ def main():
     file_name = sys.argv[1]
 
     # Instantiating the grid map object
-    kwargs_spline= {'knot_space': .1, 
+    kwargs_spline= {'knot_space': .05, 
                     'map_size': np.array([25.,25.]),
                     'logodd_occupied': .9,
                     'logodd_free': .7}
@@ -41,7 +41,8 @@ def main():
         data = np.fromstring( data, dtype=np.float, sep=' ' )
         pose = np.array(data[0:3]) 
         ranges = data[6:]
-        if n < 60:
+        # Localization
+        if n < 30:
             localization.pose = pose
         else:
             localization.update_localization(map, ranges)

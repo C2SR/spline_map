@@ -175,6 +175,5 @@ class SplineLocalization:
             residue = self.compute_pose(map, pts_occ_local, pts_occ, self.pose)
             self.time[4] += time.time() - tic
             nb_iterations += 1
-        if (nb_iterations==self.nb_iteration_max):
-            print('Reached max nb of iterations')
-        return residue
+
+        return residue, nb_iterations
