@@ -14,6 +14,8 @@ class SplineLocalization:
         logodd_min_free = kwargs['logodd_min_free'] if 'logodd_min_free' in kwargs else -100
         logodd_max_occupied = kwargs['logodd_max_occupied'] if 'logodd_max_occupied' in kwargs else 100
         det_Hinv_threshold = kwargs['det_Hinv_threshold'] if 'det_Hinv_threshold' in kwargs else 1e-4
+        delta_pose_max = kwargs['delta_pose_max'] if 'delta_pose_max' in kwargs else 1e-3
+        nb_iteration_max = kwargs['nb_iteration_max'] if 'nb_iteration_max' in kwargs else 10
 
         # Spline-map parameters
         self.degree = 3
@@ -32,8 +34,11 @@ class SplineLocalization:
         self.angles = np.arange(min_angle, max_angle+angle_increment, angle_increment )                
 
         # Localization parameters
+        self.delta_pose_max = delta_pose_max
+        self.nb_iteration_max = nb_iteration_max        
         self.det_Hinv_threshold = det_Hinv_threshold
         self.pose = np.zeros(3)
+        
         # Time
         self.time = np.zeros(5)  
 
@@ -139,13 +144,17 @@ class SplineLocalization:
             delta_pose = np.linalg.inv(H)@b
             self.pose[0] += delta_pose[0,0]
             self.pose[1] += delta_pose[1,0]
-            self.pose[2] += delta_pose[2,0]           
+            self.pose[2] += delta_pose[2,0]
+            # giving more weight to orientation
+            return np.linalg.norm(np.array([1,1,2.])*delta_pose)
         else:
             print('[Localization] Failed')
+            return 1
 
 
     """"Occupancy grid mapping routine to update map using range measurements"""
     def update_localization(self, map, ranges):
+        
         # Removing spurious measurements
         tic = time.time()
         ranges, angles = self.remove_spurious_measurements(ranges)
@@ -154,13 +163,18 @@ class SplineLocalization:
         tic = time.time()
         pts_occ_local = self.range_to_coordinate(ranges, angles)
         self.time[1] += time.time() - tic
-        # Transforming metric coordinates from the local to the global frame
-        tic = time.time()
-        pts_occ = self.local_to_global_frame(self.pose, pts_occ_local)
-        self.time[3] += time.time() - tic        
-        # Localization
-        tic = time.time()
-        self.compute_pose(map, pts_occ_local, pts_occ, self.pose)
-
-
-        self.time[4] += time.time() - tic
+        residue = 1
+        nb_iterations = 0
+        while residue > self.delta_pose_max and nb_iterations < self.nb_iteration_max:
+            # Transforming metric coordinates from the local to the global frame
+            tic = time.time()
+            pts_occ = self.local_to_global_frame(self.pose, pts_occ_local)
+            self.time[3] += time.time() - tic        
+            # Localization
+            tic = time.time()
+            residue = self.compute_pose(map, pts_occ_local, pts_occ, self.pose)
+            self.time[4] += time.time() - tic
+            nb_iterations += 1
+        if (nb_iterations==self.nb_iteration_max):
+            print('Reached max nb of iterations')
+        return residue
