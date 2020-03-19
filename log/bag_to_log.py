@@ -33,4 +33,4 @@ def main():
         # Scan messages
         ranges = np.array(list(scans[i].message.ranges))
         zero_padding = np.zeros(3)
-        print position.x, position.y, yaw, ' '.join(map(str, zero_padding)), ' '.join(map(str, ranges))
+        #print position.x, position.y, yaw, ' '.join(map(str, zero_padding)), ' '.join(map(str, ranges))
