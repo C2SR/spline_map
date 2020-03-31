@@ -142,19 +142,24 @@ class SplineLocalization:
 
         if np.linalg.det(H) > self.det_Hinv_threshold:
             delta_pose = np.linalg.inv(H)@b
-            self.pose[0] += delta_pose[0,0]
-            self.pose[1] += delta_pose[1,0]
-            self.pose[2] += delta_pose[2,0]
+            self.pose[0] += delta_pose[0]
+            self.pose[1] += delta_pose[1]
+            self.pose[2] += delta_pose[2]
+            if self.pose[2] > np.pi:
+                self.pose[2] -= 2*np.pi
+            elif self.pose[2] < -np.pi:
+                self.pose[2] += 2*np.pi
             # giving more weight to orientation
-            return np.linalg.norm(np.array([1,1,2.])*delta_pose)
+            return np.linalg.norm(np.array([1,1,1.])*delta_pose)
         else:
             print('[Localization] Failed')
             return 1
 
 
     """"Occupancy grid mapping routine to update map using range measurements"""
-    def update_localization(self, map, ranges):
-        
+    def update_localization(self, map, ranges, pose_estimative=None):
+        if pose_estimative is not None:
+            self.pose = pose_estimative
         # Removing spurious measurements
         tic = time.time()
         ranges, angles = self.remove_spurious_measurements(ranges)
@@ -175,5 +180,4 @@ class SplineLocalization:
             residue = self.compute_pose(map, pts_occ_local, pts_occ, self.pose)
             self.time[4] += time.time() - tic
             nb_iterations += 1
-
         return residue, nb_iterations

@@ -59,6 +59,7 @@ class SplineMap:
         ind_occ = np.logical_and(ranges >= self.range_min, ranges <= self.range_max)
         ind_free = (ranges >= self.range_min)        
         ranges = np.minimum(np.maximum(ranges, self.range_min), self.range_max)
+        #return np.concatenate([ranges[ind_occ],ranges[ind_occ]-.5*self.knot_space]), np.concatenate([self.angles[ind_occ],self.angles[ind_occ]]), ranges[ind_free], self.angles[ind_free] 
         return ranges[ind_occ], self.angles[ind_occ], ranges[ind_free], self.angles[ind_free] 
 
     """ Transforms ranges measurements to (x,y) coordinates (local frame) """
@@ -150,13 +151,13 @@ class SplineMap:
         by, cy = self.compute_spline(pts[1,:], self.grid_center[1,0])
 
         # Compute spline tensor
+        ctrl_pt_index = np.zeros([nb_pts,(self.degree+1)**2],dtype='int')
         B = np.zeros([nb_pts,(self.degree+1)**2])
         for i in range(0,self.degree+1):
             for j in range(0,self.degree+1):           
                 B[:,i*(self.degree+1)+j] = by[:,i]*bx[:,j]
 
         # Kronecker product for index
-        ctrl_pt_index = np.zeros([nb_pts,(self.degree+1)**2],dtype='int')
         for i in range(0, self.degree+1):
             for j in range(0, self.degree+1):
                 ctrl_pt_index[:,i*(self.degree+1)+j] = cy[:,i]*(self.grid_size[0,0])+cx[:,j]
@@ -201,7 +202,7 @@ class SplineMap:
 
         # Forcing the points to remain bounded
         self.ctrl_pts[c_index_min:c_index_max+1] = np.minimum(np.maximum(self.ctrl_pts[c_index_min:c_index_max+1], self.logodd_min_free), self.logodd_max_occupied)
-            
+           
     """"Occupancy grid mapping routine to update map using range measurements"""
     def update_map(self, pose, ranges):
         # Removing spurious measurements
@@ -219,7 +220,7 @@ class SplineMap:
         pts_free_end = self.local_to_global_frame(pose,pts_free_end_local)
         self.update_map_size(pts_free_end)
         self.time[3] += time.time() - tic        
-        # Detecting free cells in metric coordinates
+        # Detecting free space in metric coordinates
         tic = time.time()
         pts_free_local = self.detect_free_space(pose[0:2], ranges_free, angles_free)
         self.time[2] += time.time() - tic

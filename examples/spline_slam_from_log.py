@@ -15,12 +15,18 @@ def main():
     file_name = sys.argv[1]
 
     # Instantiating the grid map object
-    kwargs_spline= {'knot_space': .05, 
-                    'map_size': np.array([25.,25.]),
-                    'logodd_occupied': .9,
-                    'logodd_free': .7}
-    localization = SplineLocalization(**kwargs_spline)
-    map = SplineMap(**kwargs_spline)
+    localization = {}
+    mapping = {}
+    nb_resolution = 4
+    for i in range(0,nb_resolution):
+        kwargs_spline= {'knot_space': .05*(2**(nb_resolution-i-1)), 
+                        'map_size': np.array([25.,25.]),
+                        'logodd_occupied': .9,
+                        'logodd_free': .7,
+                        'nb_iteration_max': 10,
+                        'delta_pose_max': 1e-3}
+        localization[i] = SplineLocalization(**kwargs_spline)
+        mapping[i] = SplineMap(**kwargs_spline)
 
     # Opening log file
     file_handle = open(file_name, "r")
@@ -28,60 +34,59 @@ def main():
     data = file_handle.readline()  
     data = np.fromstring( data, dtype=np.float, sep=' ' )
     
-    # Read the data and build the map
-    n = 0
-    avg_time = 0
     # Plot
-    fig, ax = plt.subplots()
+    fig, axs = plt.subplots(1,max(2,nb_resolution))
+    fig.tight_layout()
     plt.show(block=False)
-    
-    k=1
+
+    k=n= 0
     for data in file_handle:
         # collecting the data
         data = np.fromstring( data, dtype=np.float, sep=' ' )
         pose = np.array(data[0:3]) 
         ranges = data[6:]
-        # Localization
-        if n < 30:
-            localization.pose = pose
-        else:
-            localization.update_localization(map, ranges)
-            print('True pose:', pose)
-            print('Estimated pose:', localization.pose)
-            print('Estimation error:', pose-localization.pose)
-            print('####################################')
-        #update the map
-        before = time.time()
-        map.update_map(localization.pose, ranges)
-        avg_time += time.time() - before
+        for i in range(0, nb_resolution):
+            # Localization
+            if n < 30:
+                localization[i].pose = np.copy(pose)
+            else:
+                if i==0:
+                    pose_estimative = localization[nb_resolution-1].pose 
+                else:
+                    pose_estimative = localization[i-1].pose 
+                localization[i].update_localization(mapping[i], ranges, pose_estimative)
+                print(' '.join(map(str, np.hstack([np.array(n), pose, localization[i].pose])    )))
+            #update the map
+            mapping[i].update_map(localization[i].pose, ranges)
+        
         k += 1
         n += 1
-        if k > 25:
-            #print(pose[0:2])
-            ax = plt.imshow(map.ctrl_pts.reshape([map.grid_size[0,0],map.grid_size[1,0]], order='F'),
-                            interpolation='nearest',
-                            cmap='gray_r',
-                            origin='upper',
-                            vmax = map.logodd_max_occupied, 
-                            vmin= map.logodd_min_free)
-            #ax.set_extent([map.xy_min,map.xy_max-map.knot_space,map.xy_min,map.xy_max-map.knot_space])
+        if k > 25 :
+            for i in range(0, nb_resolution):
+                axs[i].imshow(mapping[i].ctrl_pts.reshape([mapping[i].grid_size[0,0],mapping[i].grid_size[1,0]], order='F'),
+                                interpolation='nearest',
+                                cmap='gray_r',
+                                origin='upper',
+                                vmax = mapping[i].logodd_max_occupied, 
+                                vmin= mapping[i].logodd_min_free)           
+                #ax.set_extent([map.xy_min,map.xy_max-map.knot_space,map.xy_min,map.xy_max-map.knot_space])                               
             plt.pause(.001)
             k = 0    
+        if n > 350:
+        #    break
+            pass
     ## Computing/printing total and per task time
-    total_time = np.sum(localization.time[0:5])
-    avg_time = np.sum(localization.time[0:5]/n)
-    print('--------')
-    print('Removing spurious measurements: {:.2f} ms. Relative time: {:.2f}%'.format(localization.time[0]/n * 1000, localization.time[0]/total_time*100)) 
-    print('Converting range to coordinate: {:.2f} ms. Relative time: {:.2f}%'.format(localization.time[1]/n * 1000, localization.time[1]/total_time*100)) 
-    print('Transforming local to global frame: {:.2f} ms. Relative time: {:.2f}%'.format(localization.time[3]/n * 1000, localization.time[3]/total_time*100)) 
-    print('Detecting free cells: {:.2f} ms. Relative time: {:.2f}%'.format(localization.time[2]/n * 1000, localization.time[2]/total_time*100)) 
-    print('Updating logodd SPLINE localization: {:.2f} ms. Relative time: {:.2f}%'.format(localization.time[4]/n * 1000, localization.time[4]/total_time*100)) 
+    #localization_total_time = np.sum(localization.time[0:5])
+    #localization_avg_time = np.sum(localization_total_time/(n-30))
+    #mapping_total_time = np.sum(spline_map.time[0:5])
+    #mapping_avg_time = np.sum(mapping_total_time/(n-30))    
+    #print('--------')
+    #print('Localization avg time: {:.2f} ms'.format(localization_avg_time* 1000) )
+    #print('Mapping avg time: {:.2f} ms'.format(mapping_avg_time*1000))
+    #print('Diff Localization avg time: {:.2f} ms'.format( 1000*(total_time - localization_total_time)) )  
+    #print('--------')
     
-    print('--------')
-    print('Average time: {:.2f} ms'.format(np.sum(localization.time[0:5]/n) * 1000))
-    print('Average frequency: {:.2f} Hz'.format(1/(np.sum(localization.time[0:5]/n))))
-    
-    input("Hit enter to continue")
+    #input("Hit enter to continue")
 
 if __name__ == '__main__':
     main()
