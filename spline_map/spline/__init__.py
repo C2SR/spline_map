@@ -1,1 +1,2 @@
 from .spline_map_recursive import SplineMap
+from .spline_map_deterministic import SplineMapDeterministic

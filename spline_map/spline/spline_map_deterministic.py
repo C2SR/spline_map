@@ -4,7 +4,7 @@ import time
 
 import scipy.sparse.linalg
 
-class SplineMap:
+class SplineMapDeterministic:
     def __init__(self, **kwargs):
         # Parameters
         knot_space = kwargs['knot_space'] if 'knot_space' in kwargs else .05
@@ -14,10 +14,8 @@ class SplineMap:
         angle_increment = kwargs['angle_increment'] if 'angle_increment' in kwargs else 1.*np.pi/180.
         range_min = kwargs['range_min'] if 'range_min' in kwargs else 0.12
         range_max = kwargs['range_max'] if 'range_max' in kwargs else 3.6
-        logodd_occupied = kwargs['logodd_occupied'] if 'logodd_occupied' in kwargs else .9
-        logodd_free = kwargs['logodd_free'] if 'logodd_free' in kwargs else .7
-        logodd_min_free = kwargs['logodd_min_free'] if 'logodd_min_free' in kwargs else -100
-        logodd_max_occupied = kwargs['logodd_max_occupied'] if 'logodd_max_occupied' in kwargs else 100
+        occ_val = kwargs['occ_val'] if 'occ_val' in kwargs else 1.0
+        free_val = kwargs['free_val'] if 'free_val' in kwargs else -1.0
 
         # Spline-map parameters
         # @TODO grid_size has to be greater than (2d x 2d)
@@ -25,18 +23,16 @@ class SplineMap:
         self.knot_space = knot_space
         self.grid_size = np.ceil(map_size/knot_space+self.degree).astype(int).reshape([2,1]) 
         self.grid_center = np.ceil((self.grid_size-self.degree)/2).reshape(2,1) + self.degree - 1  
-        self.ctrl_pts = .5*(logodd_max_occupied+logodd_min_free)*np.ones((self.grid_size[0,0], self.grid_size[1,0]) ).flatten()
+        self.ctrl_pts = .5*(occ_val+free_val)*np.ones((self.grid_size[0,0], self.grid_size[1,0]) ).flatten()
 
         # Map parameters
         self.map_increment = range_max    
         self.map_lower_limits = (self.degree - self.grid_center)*self.knot_space
         self.map_upper_limits = (self.grid_size-self.grid_center+1)*self.knot_space          
 
-        # LogOdd Map parameters
-        self.logodd_occupied = logodd_occupied
-        self.logodd_free = logodd_free
-        self.logodd_min_free = logodd_min_free
-        self.logodd_max_occupied = logodd_max_occupied
+        # Map parameters
+        self.occ_val = occ_val
+        self.free_val = free_val        
         self.free_detection_spacing = 1.41*knot_space 
         self.free_ranges = np.arange(min(knot_space, range_min), range_max, self.free_detection_spacing)        
         
@@ -188,10 +184,10 @@ class SplineMap:
         B_free_norm_squared = B_free_norm**2
 
         # Fitting error
-        e_occ = (self.logodd_max_occupied - y_est_occ)      
-        mag_occ = np.minimum(self.logodd_occupied/B_occ_norm_squared, np.abs(e_occ)) * np.sign(e_occ) 
-        e_free = (self.logodd_min_free - y_est_free)      
-        mag_free = np.minimum(self.logodd_free/B_free_norm_squared, np.abs(e_free)) * np.sign(e_free) 
+        e_occ = (self.occ_val - y_est_occ)   
+        mag_occ =  .009*e_occ/B_occ_norm_squared # * np.sign(e_occ)
+        e_free = (self.free_val - y_est_free) 
+        mag_free =  .006*e_free/B_free_norm_squared # * np.sign(e_free)
 
         # Update control points
         for i in range(0,n_occ):
@@ -200,7 +196,8 @@ class SplineMap:
             self.ctrl_pts[c_index_free[i,:]] += B_free[i,:]*mag_free[i]
 
         # Forcing the points to remain bounded
-        self.ctrl_pts[c_index_min:c_index_max+1] = np.minimum(np.maximum(self.ctrl_pts[c_index_min:c_index_max+1], self.logodd_min_free), self.logodd_max_occupied)
+        #self.ctrl_pts[c_index_min:c_index_max+1] = np.minimum(np.maximum(self.ctrl_pts[c_index_min:c_index_max+1], self.logodd_min_free), self.logodd_max_occupied)
+        self.ctrl_pts[c_index_min:c_index_max+1] = self.ctrl_pts[c_index_min:c_index_max+1]
             
     """"Occupancy grid mapping routine to update map using range measurements"""
     def update_map(self, pose, ranges):
