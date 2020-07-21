@@ -192,12 +192,9 @@ class SplineMap:
         mag_occ = np.minimum(1./B_occ_norm_squared, np.abs(e_occ)) * np.sign(e_occ)
         e_free = (self.logodd_min_free - y_est_free)      
         mag_free = np.minimum(1./B_free_norm_squared, np.abs(e_free)) * np.sign(e_free)
-
-        # Update control points
-        for i in range(0,n_occ):
-            self.ctrl_pts[c_index_occ[i,:]] += B_occ[i,:]*mag_occ[i]
-        for i in range(0,n_free):
-            self.ctrl_pts[c_index_free[i,:]] += B_free[i,:]*mag_free[i]
+                
+        np.add.at(self.ctrl_pts, c_index_occ, (B_occ.T*mag_occ).T)
+        np.add.at(self.ctrl_pts, c_index_free, (B_free.T*mag_free).T)
 
         # Forcing the points to remain bounded
         self.ctrl_pts[c_index_min:c_index_max+1] = np.minimum(np.maximum(self.ctrl_pts[c_index_min:c_index_max+1], self.logodd_min_free), self.logodd_max_occupied)
