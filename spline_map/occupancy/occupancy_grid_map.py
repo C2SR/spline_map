@@ -121,12 +121,14 @@ class OccupancyGridMap:
     """Updates map following logodd approach"""
     def update_cell_occupancy(self, origin, occupied, free):
         self.occupancy_grid[origin[0,0], origin[1,0]] = self.logodd_min_free        
-        for cell in free.T:
-            self.occupancy_grid[cell[0],cell[1]] = np.maximum(self.logodd_min_free,
-                self.occupancy_grid[cell[0], cell[1]] - self.logodd_free)
-        for cell in occupied.T:
-            self.occupancy_grid[cell[0],cell[1]] = np.minimum(self.logodd_max_occupied,
-                self.occupancy_grid[cell[0], cell[1]] + self.logodd_occupied) 
+        self.occupancy_grid = self.occupancy_grid.flatten()
+        
+        grid_shape = tuple(self.grid_size.flatten())
+        np.add.at(self.occupancy_grid, np.ravel_multi_index(free, grid_shape), -self.logodd_free)
+        np.add.at(self.occupancy_grid, np.ravel_multi_index(occupied, grid_shape), self.logodd_occupied)        
+        self.occupancy_grid = np.maximum(self.logodd_min_free, np.minimum(self.logodd_max_occupied, self.occupancy_grid))
+        
+        self.occupancy_grid = self.occupancy_grid.reshape(grid_shape)
 
     """"Occupancy grid mapping routine to update map using range measurements"""
     def update_map(self, pose, ranges):
