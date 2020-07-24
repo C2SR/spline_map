@@ -15,7 +15,7 @@ def main():
     kwargs_spline_map = {'knot_space': .05, 
                         'map_size': np.array([5.,5.]),
                         'logodd_occupied': .9,
-                        'logodd_free': .7}
+                        'logodd_free': .6}
     map = SplineMap(**kwargs_spline_map)
 
     # Opening log file

@@ -15,7 +15,7 @@ class SplineMap:
         range_min = kwargs['range_min'] if 'range_min' in kwargs else 0.12
         range_max = kwargs['range_max'] if 'range_max' in kwargs else 3.6
         logodd_occupied = kwargs['logodd_occupied'] if 'logodd_occupied' in kwargs else .9
-        logodd_free = kwargs['logodd_free'] if 'logodd_free' in kwargs else .7
+        logodd_free = kwargs['logodd_free'] if 'logodd_free' in kwargs else .3
         logodd_min_free = kwargs['logodd_min_free'] if 'logodd_min_free' in kwargs else -100
         logodd_max_occupied = kwargs['logodd_max_occupied'] if 'logodd_max_occupied' in kwargs else 100
 
@@ -189,15 +189,12 @@ class SplineMap:
 
         # Fitting error
         e_occ = (self.logodd_max_occupied - y_est_occ)      
-        mag_occ = np.minimum(1./B_occ_norm_squared, np.abs(e_occ)) * np.sign(e_occ)
+        mag_occ = np.minimum(self.logodd_occupied/B_occ_norm_squared, np.abs(e_occ)) * np.sign(e_occ)
         e_free = (self.logodd_min_free - y_est_free)      
-        mag_free = np.minimum(1./B_free_norm_squared, np.abs(e_free)) * np.sign(e_free)
-
-        # Update control points
-        for i in range(0,n_occ):
-            self.ctrl_pts[c_index_occ[i,:]] += B_occ[i,:]*mag_occ[i]
-        for i in range(0,n_free):
-            self.ctrl_pts[c_index_free[i,:]] += B_free[i,:]*mag_free[i]
+        mag_free = np.minimum(self.logodd_free/B_free_norm_squared, np.abs(e_free)) * np.sign(e_free)
+                
+        np.add.at(self.ctrl_pts, c_index_occ, (B_occ.T*mag_occ).T)
+        np.add.at(self.ctrl_pts, c_index_free, (B_free.T*mag_free).T)
 
         # Forcing the points to remain bounded
         self.ctrl_pts[c_index_min:c_index_max+1] = np.minimum(np.maximum(self.ctrl_pts[c_index_min:c_index_max+1], self.logodd_min_free), self.logodd_max_occupied)
